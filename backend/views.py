@@ -151,7 +151,6 @@ class AllergyDetailsViewSet(APIView):
 
 
 class VitalDetailsViewSet(APIView):
-
     def get(self, request, patientid):
         serializer_class = VitalDetailsSerializer
         patientid = uuid.UUID(patientid)
@@ -326,7 +325,22 @@ class PatientViewSet(APIView):
 
 
 class MedicationViewSet(APIView):
+    def delete(self, request, patientid, medid):
+        token = getToken(request, None, patientid)
+        if token is None:
+            content = {'Invalid token'}
+            return Response(content, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            patient = PatientDetails.objects.get(id=patientid)
+            meds = Medication.objects.get(id=medid)
+            meds.delete()
+            return Response(status=status.HTTP_200_OK)
+        except:
+            content = {"Not found"}
+            return Response(content, status=status.HTTP_400_BAD_REQUEST)
 
+class MedicationListViewSet(APIView):
     def get(self, request, patientid):
         serializer_class = MedicationSerializer
         patientid = uuid.UUID(patientid)
@@ -359,7 +373,6 @@ class MedicationViewSet(APIView):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 class DosageViewSet(ModelViewSet):
     queryset = Dosage.objects.all()
