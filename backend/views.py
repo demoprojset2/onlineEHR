@@ -32,7 +32,6 @@ def getToken(request, doctorid=None, patientid=None):
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms="HS256")
         userid = str(payload['user'])
-
         if doctorid is not None:
             doctorid = str(doctorid)
             if userid == doctorid:
@@ -72,9 +71,33 @@ class GetAllPatients(APIView):
 
 
 class IndAllergyViewSet(APIView):
-    def post(self, request, patientid, id):
-        serializer_class = AllergySerializer
+    def delete(self, request, patientid, id):
         patientid = uuid.UUID(patientid)
+        id = int(id)
+        patient = None
+        try:
+            patient = PatientDetails.objects.get(id=patientid)
+        except:
+            content = {'Patient does not exist'}
+            return Response(content, status=status.HTTP_404_NOT_FOUND)
+
+        token = getToken(request, None, patientid)
+        if token is None:
+            content = {'Invalid token'}
+            return Response(content, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            allergydetail = Allergy.objects.get(pk=id)
+            allergydetail.delete()
+            return Response(status=status.HTTP_200_OK)
+        except:
+            content={'Allergy not found'}
+            return Response(content, status=status.HTTP_400_BAD_REQUEST)
+
+
+    def patch(self, request, patientid, id):
+        patientid = uuid.UUID(patientid)
+        print("100 line number")
         id = int(id)
         patient = None
         try:
@@ -325,6 +348,27 @@ class PatientViewSet(APIView):
 
 
 class MedicationViewSet(APIView):
+    def patch(self, request, patientid, medid):
+        token = getToken(request, None, patientid)
+        if token is None:
+            content = {'Invalid token'}
+            return Response(content, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            # patient = PatientDetails.objects.get(id=patientid)
+            med = Medication.objects.get(id=medid)            
+            data = request.data
+            data['patient'] = patientid
+            serializer = MedicationSerializer(med, data=data)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except:
+            content = {'Medication not found'}
+            return Response(content, status=status.HTTP_400_BAD_REQUEST)
+
+
     def delete(self, request, patientid, medid):
         token = getToken(request, None, patientid)
         if token is None:
@@ -374,10 +418,11 @@ class MedicationListViewSet(APIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
 class DosageViewSet(ModelViewSet):
     queryset = Dosage.objects.all()
     serializer_class = DosageSerializer
-
+    
     @action(methods=['get'], detail=True)
     def dose(self, request, *args, **kwargs):
         target_user = int(kwargs['medid'])
@@ -389,6 +434,24 @@ class DosageViewSet(ModelViewSet):
         except:
             content = {"Not found"}
             return Response(content, status=status.HTTP_400_BAD_REQUEST)
+
+    def update(self, request, *args, **kwargs):
+        target_user = int(kwargs['medid'])
+        
+        try:
+            medication = Medication.objects.get(pk=target_user)
+            dosage = Dosage.objects.get(medication=medication)
+            data = request.data
+            data['medication'] = target_user
+            serializer = DosageSerializer(dosage, data=data)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except:
+            content = {'No medication found'}
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
     def adddose(self, request, *args, **kwargs):
         target_user = int(kwargs['medid'])
@@ -448,7 +511,7 @@ class ProblemViewSet(APIView):
 
 
 class IndProblemViewSet(APIView):
-    def post(self, request, patientid, id):
+    def patch(self, request, patientid, id):
 
         token = getToken(request, None, patientid)
         if token is None:
@@ -472,6 +535,23 @@ class IndProblemViewSet(APIView):
             return Response(content, status=status.HTTP_404_NOT_FOUND)
 
 
+    def delete(self, request, patientid, id):
+        token = getToken(request, None, patientid)
+        if token is None:
+            content = {'Invalid token'}
+            return Response(content, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer_class = ProblemDetailsSerializer
+        patientid = uuid.UUID(patientid)
+        try:
+            problem = ProblemDetails.objects.get(id=id)
+            problem.delete()
+            return Response(status=status.HTTP_200_OK)
+        except:
+            content = {"Not found"}
+            return Response(content, status=status.HTTP_400_BAD_REQUEST)
+
+
 class SocialViewSet(APIView):
     def get(self, request, patientid):
 
@@ -490,7 +570,7 @@ class SocialViewSet(APIView):
             return Response(content, status=status.HTTP_404_NOT_FOUND)
 
         try:
-            socialdetails = SocialHistory.objects.get(patient=patient)
+            socialdetails = SocialHistory.objects.filter(patient=patient)
             return Response(SocialHistorySerializer(socialdetails).data, status=status.HTTP_200_OK)
         except:
             content = {'social details not found'}
