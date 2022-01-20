@@ -20,6 +20,7 @@ class PatientDetails(models.Model):
     address = models.CharField(max_length=255)
     dob = models.DateField()
     phone_number = PhoneNumberField()
+    # is_active = models.BooleanField(default=True)
     doctor = models.ForeignKey(Profile, blank=True, on_delete=models.CASCADE)
 
     def __str__(self):
@@ -123,3 +124,6 @@ class SocialHistory(models.Model):
 
     def __str__(self):
         return self.patient.name
+
+
+    
